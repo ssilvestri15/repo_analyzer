@@ -1,0 +1,236 @@
+# Repository Analyzer 🔍
+Un potente strumento per analizzare metriche di qualità del codice Python commit per commit in repository Git, con supporto per analisi parallela e classificazione automatica dei commit.
+
+## 🌟 Caratteristiche Principali
+
+- **Analisi Commit-by-Commit**: Estrae metriche dettagliate per ogni commit
+- **Elaborazione Parallela**: Supporta analisi simultanea di più repository e commit
+- **Metriche Avanzate**: Complessità ciclomatica, code smells, warning, densità di bug
+- **Classificazione Automatica**: Categorizza i commit (new feature, bug fix, enhancement, refactoring)
+- **Resume Capability**: Riprende analisi interrotte usando checkpoint
+- **Report Comparativi**: Genera report dettagliati per singoli repository e confronti multi-repo
+- **Robusto Error Handling**: Gestione avanzata degli errori con strategie di recovery
+
+## 📊 Metriche Estratte
+
+### 🔢 Metriche Base
+- **LOC**: Linee di codice aggiunte/eliminate
+- **File modificati**: Numero e lista dei file cambiati
+- **Autore e timestamp**: Informazioni sull'autore e data del commit
+
+### 🧠 Metriche di Complessità
+- **Complessità Ciclomatica**: Per commit e per progetto (usando Lizard)
+- **Esperienza Autore**: Numero di commit precedenti dell'autore
+- **Tempo tra Commit**: Tempo trascorso dall'ultimo commit dell'autore
+
+### 🐛 Metriche di Qualità
+- **Code Smells**: Rilevamento tramite CodeSmile
+- **Warning**: Usando Pylint per analisi statica
+- **Densità di Smell**: Rapporto smells/LOC
+- **Bug Fix Detection**: Identificazione automatica di commit di bug fix
+
+### 🏷️ Classificazione Commit
+- **New Feature**: Nuove funzionalità
+- **Bug Fixing**: Correzione di errori
+- **Enhancement**: Miglioramenti e aggiornamenti
+- **Refactoring**: Ristrutturazione del codice
+
+## 🚀 Installazione
+
+### Prerequisiti
+
+```bash
+# Python 3.6 o superiore
+python --version
+
+# Git installato e accessibile
+git --version
+```
+
+### Installazione delle Dipendenze
+
+```bash
+
+# Clona il repository Smell AI
+git clone https://github.com/ssilvestri15/smell_ai.git
+
+# Clona il repository
+git clone https://github.com/ssilvestri15/repo-analyzer.git
+cd repo-analyzer
+
+python3.11 .m venv .venv
+source ./venv/bin/activate
+
+# Installa le dipendenze
+pip install -r requirements.txt
+
+# Installazione in modalità sviluppatore
+pip install -e .
+```
+
+### Dipendenze Principali
+
+- **GitPython**: Interfaccia Python per Git
+- **Pandas**: Manipolazione e analisi dati
+- **Lizard**: Analisi complessità ciclomatica
+- **Pylint**: Analisi statica del codice
+- **CodeSmile**: Rilevamento code smells (modulo custom)
+- **psutil**: Monitoraggio risorse di sistema
+
+## 📖 Utilizzo
+
+### Analisi Singolo Repository
+
+```bash
+# Analisi base
+python -m repo_analyzer single https://github.com/user/repo.git
+
+# Con opzioni avanzate
+python -m repo_analyzer single https://github.com/user/repo.git \
+    --output-dir results/my-repo \
+    --max-commits 100 \
+    --resume
+```
+
+### Analisi Multi-Repository
+
+```bash
+# Da lista di URL
+python -m repo_analyzer multi \
+    https://github.com/user/repo1.git \
+    https://github.com/user/repo2.git \
+    https://github.com/user/repo3.git \
+    --output-dir multi-analysis \
+    --max-commits 50
+
+# Da file di testo
+echo "https://github.com/user/repo1.git" > repos.txt
+echo "https://github.com/user/repo2.git" >> repos.txt
+
+python -m repo_analyzer file repos.txt \
+    --output-dir batch-analysis \
+    --repo-workers 4 \
+    --resume
+```
+
+### Opzioni Comuni
+
+| Opzione | Descrizione |
+|---------|-------------|
+| `--output-dir` | Directory di output per i risultati |
+| `--max-commits` | Numero massimo di commit da analizzare |
+| `--resume` | Riprende analisi interrotta |
+| `--sequential` | Modalità sequenziale (più stabile) |
+| `--max-workers` | Numero di worker paralleli |
+
+## 📁 Struttura Output
+
+```
+repo_analysis_results/
+├── repository-name/
+│   ├── commit_metrics.csv          # Metriche dettagliate per commit
+│   ├── commit_metrics.json         # Stesso contenuto in formato JSON
+│   ├── file_frequencies.json       # Frequenza modifiche/bug per file
+│   ├── report_summary.txt          # Report riassuntivo
+│   ├── error_report.txt           # Log degli errori
+│   └── checkpoint.json            # Stato per resume
+├── all_repos_metrics.csv          # Metriche combinate (multi-repo)
+├── comparative_report.txt         # Report comparativo
+└── commit_classification_summary.json  # Riassunto classificazioni
+```
+
+## 📈 Esempio di Metriche
+
+### CSV Output (commit_metrics.csv)
+```csv
+commit_hash,author,date,message,LOC_added,LOC_deleted,files_changed,commit_cyclomatic_complexity,project_cyclomatic_complexity,author_experience,time_since_last_commit,smell_density,num_warnings,is_pr,is_bug_fix,new_feature,bug_fixing,enhancement,refactoring
+abc123...,John Doe,2024-01-15T10:30:00,Add user authentication,45,12,3,8.5,156.2,15,2.5,0.0023,2,False,False,1,0,0,0
+def456...,Jane Smith,2024-01-16T14:20:00,Fix login bug,8,15,2,3.2,158.9,8,3.1,0.0019,0,False,True,0,1,0,0
+```
+
+### Report Summary
+```txt
+Report di analisi per: example-repo
+Data: 2024-01-20 15:30:45
+Numero totale di commit analizzati: 150
+
+Statistiche medie:
+- LOC aggiunte per commit: 23.45
+- LOC eliminate per commit: 18.32
+- File modificati per commit: 2.8
+- Complessità ciclomatica media dei commit: 12.7
+- Complessità ciclomatica media del progetto: 245.8
+- Esperienza media degli autori: 12.3 commit precedenti
+- Tempo medio dall'ultimo commit: 4.2 ore
+- Densità di smell media: 0.0031
+- Numero medio di warning: 1.2
+- Numero medio di bug fix: 18 (12.00%)
+
+Numero di Pull Request: 25 (16.67%)
+Numero di autori distinti: 8
+```
+
+### Ottimizzazione Prestazioni
+
+```bash
+# Per repository molto grandi
+python -m repo_analyzer single https://github.com/large/repo.git \
+    --max-workers 2 \
+    --max-commits 1000
+
+# Per analisi batch ottimizzata
+python -m repo_analyzer file repos.txt \
+    --repo-workers 3 \
+    --commit-workers 2 \
+    --sequential
+```
+
+## 🔧 Risoluzione Problemi
+
+### Errori Comuni
+
+**GitPython "read of closed file"**:
+```bash
+# Usa modalità sequenziale
+python -m repo_analyzer single URL --sequential
+```
+
+**Repository corrotto o commit mancanti**:
+```bash
+# L'analyzer salta automaticamente commit corrotti
+# Controlla error_report.txt per dettagli
+```
+
+**Memoria insufficiente**:
+```bash
+# Riduci i worker paralleli
+python -m repo_analyzer single URL --max-workers 1
+```
+
+### Resume dopo Interruzione
+
+```bash
+# L'analisi salva automaticamente checkpoint
+python -m repo_analyzer single URL --resume
+```
+
+## 📄 Licenza
+
+Questo progetto è licenziato sotto la MIT License - vedi il file [LICENSE](LICENSE) per dettagli.
+
+## 👨‍💻 Autore
+
+**Simone Silvestri**
+- Email: s.silvestri15@studenti.unisa.it
+- Università: Università di Salerno
+
+## 🙏 Riconoscimenti
+
+- [GitPython](https://github.com/gitpython-developers/GitPython) per l'interfaccia Git
+- [Lizard](https://github.com/terryyin/lizard) per l'analisi di complessità
+- [Pylint](https://github.com/PyCQA/pylint) per l'analisi statica
+- Community open source per ispirazione e supporto
+
+---
+
+Made with ❤️ by **Simone Silvestri**
