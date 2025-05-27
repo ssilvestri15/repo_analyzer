@@ -1,106 +1,105 @@
 # Repository Analyzer 🔍
 
-Un potente strumento per analizzare metriche di qualità del codice Python commit per commit in repository Git, con supporto per analisi parallela e classificazione automatica dei commit.
+A powerful tool for analyzing Python code quality metrics commit by commit in Git repositories, with support for parallel analysis and automatic commit classification.
 
-## 🌟 Caratteristiche Principali
+## 🌟 Key Features
 
-- **Analisi Commit-by-Commit**: Estrae metriche dettagliate per ogni commit
-- **Elaborazione Parallela**: Supporta analisi simultanea di più repository e commit
-- **Metriche Avanzate**: Complessità ciclomatica, code smells, warning, densità di bug
-- **Classificazione Automatica**: Categorizza i commit (new feature, bug fix, enhancement, refactoring)
-- **Resume Capability**: Riprende analisi interrotte usando checkpoint
-- **Report Comparativi**: Genera report dettagliati per singoli repository e confronti multi-repo
-- **Robusto Error Handling**: Gestione avanzata degli errori con strategie di recovery
+- **Commit-by-Commit Analysis**: Extracts detailed metrics for each commit
+- **Parallel Processing**: Supports simultaneous analysis of multiple repositories and commits
+- **Advanced Metrics**: Cyclomatic complexity, code smells, warnings, bug density
+- **Automatic Classification**: Categorizes commits (new feature, bug fix, enhancement, refactoring)
+- **Resume Capability**: Resumes interrupted analysis using checkpoints
+- **Comparative Reports**: Generates detailed reports for single repositories and multi-repo comparisons
+- **Robust Error Handling**: Advanced error management with recovery strategies
 
-## 📊 Metriche Estratte
+## 📊 Extracted Metrics
 
-### 🔢 Metriche Base
+### 🔢 Base Metrics
 
-- **LOC**: Linee di codice aggiunte/eliminate
-- **File modificati**: Numero e lista dei file cambiati
-- **Autore e timestamp**: Informazioni sull'autore e data del commit
+- **LOC**: Lines of code added/deleted
+- **Modified files**: Number and list of changed files
+- **Author and timestamp**: Author information and commit date
 
-### 🧠 Metriche di Complessità
+### 🧠 Complexity Metrics
 
-- **Complessità Ciclomatica**: Per commit e per progetto (usando Lizard)
-- **Esperienza Autore**: Numero di commit precedenti dell'autore
-- **Tempo tra Commit**: Tempo trascorso dall'ultimo commit dell'autore
+- **Cyclomatic Complexity**: Per commit and per project (using Lizard)
+- **Author Experience**: Number of previous commits by the author
+- **Time Between Commits**: Time elapsed since the author's last commit
 
-### 🐛 Metriche di Qualità
+### 🐛 Quality Metrics
 
-- **Code Smells**: Rilevamento tramite CodeSmile
-- **Warning**: Usando Pylint per analisi statica
-- **Densità di Smell**: Rapporto smells/LOC
-- **Bug Fix Detection**: Identificazione automatica di commit di bug fix
+- **Code Smells**: Detection via CodeSmile
+- **Warnings**: Using Pylint for static analysis
+- **Smell Density**: Smells/LOC ratio
+- **Bug Fix Detection**: Automatic identification of bug fix commits
 
-### 🏷️ Classificazione Commit
+### 🏷️ Commit Classification
 
-- **New Feature**: Nuove funzionalità
-- **Bug Fixing**: Correzione di errori
-- **Enhancement**: Miglioramenti e aggiornamenti
-- **Refactoring**: Ristrutturazione del codice
+- **New Feature**: New functionalities
+- **Bug Fixing**: Error corrections
+- **Enhancement**: Improvements and updates
+- **Refactoring**: Code restructuring
 
-## 🚀 Installazione
+## 🚀 Installation
 
-### Prerequisiti
+### Prerequisites
 
 ```bash
-# Python 3.6 o superiore
+# Python 3.6 or higher
 python --version
 
-# Git installato e accessibile
+# Git installed and accessible
 git --version
 ```
 
-### Installazione delle Dipendenze
+### Dependency Installation
 
 ```bash
-
-# Clona il repository Smell AI
+# Clone the Smell AI repository
 git clone https://github.com/ssilvestri15/smell_ai.git
 
-# Clona il repository
+# Clone the repository
 git clone https://github.com/ssilvestri15/repo-analyzer.git
 cd repo-analyzer
 
 python3.11 -m venv .venv
 source ./venv/bin/activate
 
-# Installa le dipendenze
+# Install dependencies
 pip install -r requirements.txt
 
-# Installazione in modalità sviluppatore
+# Developer mode installation
 pip install -e .
 ```
 
-### Dipendenze Principali
+### Main Dependencies
 
-- **GitPython**: Interfaccia Python per Git
-- **Pandas**: Manipolazione e analisi dati
-- **Lizard**: Analisi complessità ciclomatica
-- **Pylint**: Analisi statica del codice
-- **CodeSmile**: Rilevamento code smells (modulo custom)
-- **psutil**: Monitoraggio risorse di sistema
+- **GitPython**: Python interface for Git
+- **Pandas**: Data manipulation and analysis
+- **Lizard**: Cyclomatic complexity analysis
+- **Pylint**: Static code analysis
+- **CodeSmile**: Code smell detection (custom module)
+- **psutil**: System resource monitoring
 
-## 📖 Utilizzo
+## 📖 Usage
 
-### Analisi Singolo Repository
+### Single Repository Analysis
 
 ```bash
-# Analisi base
+# Basic analysis
 python -m repo_analyzer single https://github.com/user/repo.git
 
-# Con opzioni avanzate
+# With advanced options
 python -m repo_analyzer single https://github.com/user/repo.git \
     --output-dir results/my-repo \
     --max-commits 100 \
     --resume
 ```
 
-### Analisi Multi-Repository
+### Multi-Repository Analysis
 
 ```bash
-# Da lista di URL
+# From URL list
 python -m repo_analyzer multi \
     https://github.com/user/repo1.git \
     https://github.com/user/repo2.git \
@@ -108,7 +107,7 @@ python -m repo_analyzer multi \
     --output-dir multi-analysis \
     --max-commits 50
 
-# Da file di testo
+# From text file
 echo "https://github.com/user/repo1.git" > repos.txt
 echo "https://github.com/user/repo2.git" >> repos.txt
 
@@ -118,33 +117,33 @@ python -m repo_analyzer file repos.txt \
     --resume
 ```
 
-### Opzioni Comuni
+### Common Options
 
-| Opzione | Descrizione |
+| Option | Description |
 |---------|-------------|
-| `--output-dir` | Directory di output per i risultati |
-| `--max-commits` | Numero massimo di commit da analizzare |
-| `--resume` | Riprende analisi interrotta |
-| `--sequential` | Modalità sequenziale (più stabile) |
-| `--max-workers` | Numero di worker paralleli |
+| `--output-dir` | Output directory for results |
+| `--max-commits` | Maximum number of commits to analyze |
+| `--resume` | Resume interrupted analysis |
+| `--sequential` | Sequential mode (more stable) |
+| `--max-workers` | Number of parallel workers |
 
-## 📁 Struttura Output
+## 📁 Output Structure
 
 ```
 repo_analysis_results/
 ├── repository-name/
-│   ├── commit_metrics.csv          # Metriche dettagliate per commit
-│   ├── commit_metrics.json         # Stesso contenuto in formato JSON
-│   ├── file_frequencies.json       # Frequenza modifiche/bug per file
-│   ├── report_summary.txt          # Report riassuntivo
-│   ├── error_report.txt           # Log degli errori
-│   └── checkpoint.json            # Stato per resume
-├── all_repos_metrics.csv          # Metriche combinate (multi-repo)
-├── comparative_report.txt         # Report comparativo
-└── commit_classification_summary.json  # Riassunto classificazioni
+│   ├── commit_metrics.csv          # Detailed commit metrics
+│   ├── commit_metrics.json         # Same content in JSON format
+│   ├── file_frequencies.json       # File modification/bug frequencies
+│   ├── report_summary.txt          # Summary report
+│   ├── error_report.txt           # Error log
+│   └── checkpoint.json            # State for resume
+├── all_repos_metrics.csv          # Combined metrics (multi-repo)
+├── comparative_report.txt         # Comparative report
+└── commit_classification_summary.json  # Classification summary
 ```
 
-## 📈 Esempio di Metriche
+## 📈 Metrics Example
 
 ### CSV Output (commit_metrics.csv)
 
@@ -157,90 +156,90 @@ def456...,Jane Smith,2024-01-16T14:20:00,Fix login bug,8,15,2,3.2,158.9,8,3.1,0.
 ### Report Summary
 
 ```txt
-Report di analisi per: example-repo
-Data: 2024-01-20 15:30:45
-Numero totale di commit analizzati: 150
+Analysis report for: example-repo
+Date: 2024-01-20 15:30:45
+Total number of commits analyzed: 150
 
-Statistiche medie:
-- LOC aggiunte per commit: 23.45
-- LOC eliminate per commit: 18.32
-- File modificati per commit: 2.8
-- Complessità ciclomatica media dei commit: 12.7
-- Complessità ciclomatica media del progetto: 245.8
-- Esperienza media degli autori: 12.3 commit precedenti
-- Tempo medio dall'ultimo commit: 4.2 ore
-- Densità di smell media: 0.0031
-- Numero medio di warning: 1.2
-- Numero medio di bug fix: 18 (12.00%)
+Average statistics:
+- LOC added per commit: 23.45
+- LOC deleted per commit: 18.32
+- Files modified per commit: 2.8
+- Average cyclomatic complexity of commits: 12.7
+- Average cyclomatic complexity of project: 245.8
+- Average author experience: 12.3 previous commits
+- Average time since last commit: 4.2 hours
+- Average smell density: 0.0031
+- Average number of warnings: 1.2
+- Average number of bug fixes: 18 (12.00%)
 
-Numero di Pull Request: 25 (16.67%)
-Numero di autori distinti: 8
+Number of Pull Requests: 25 (16.67%)
+Number of distinct authors: 8
 ```
 
-### Ottimizzazione Prestazioni
+### Performance Optimization
 
 ```bash
-# Per repository molto grandi
+# For very large repositories
 python -m repo_analyzer single https://github.com/large/repo.git \
     --max-workers 2 \
     --max-commits 1000
 
-# Per analisi batch ottimizzata
+# For optimized batch analysis
 python -m repo_analyzer file repos.txt \
     --repo-workers 3 \
     --commit-workers 2 \
     --sequential
 ```
 
-## 🔧 Risoluzione Problemi
+## 🔧 Troubleshooting
 
-### Errori Comuni
+### Common Errors
 
 **GitPython "read of closed file"**:
 
 ```bash
-# Usa modalità sequenziale
+# Use sequential mode
 python -m repo_analyzer single URL --sequential
 ```
 
-**Repository corrotto o commit mancanti**:
+**Corrupted repository or missing commits**:
 
 ```bash
-# L'analyzer salta automaticamente commit corrotti
-# Controlla error_report.txt per dettagli
+# The analyzer automatically skips corrupted commits
+# Check error_report.txt for details
 ```
 
-**Memoria insufficiente**:
+**Insufficient memory**:
 
 ```bash
-# Riduci i worker paralleli
+# Reduce parallel workers
 python -m repo_analyzer single URL --max-workers 1
 ```
 
-### Resume dopo Interruzione
+### Resume After Interruption
 
 ```bash
-# L'analisi salva automaticamente checkpoint
+# Analysis automatically saves checkpoints
 python -m repo_analyzer single URL --resume
 ```
 
-## 📄 Licenza
+## 📄 License
 
-Questo progetto è licenziato sotto la MIT License - vedi il file [LICENSE](LICENSE) per dettagli.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 👨‍💻 Autore
+## 👨‍💻 Author
 
 **Simone Silvestri**
 
 - Email: <s.silvestri15@studenti.unisa.it>
-- Università: Università di Salerno
+- University: University of Salerno
 
-## 🙏 Riconoscimenti
+## 🙏 Acknowledgments
 
-- [GitPython](https://github.com/gitpython-developers/GitPython) per l'interfaccia Git
-- [Lizard](https://github.com/terryyin/lizard) per l'analisi di complessità
-- [Pylint](https://github.com/PyCQA/pylint) per l'analisi statica
-- Community open source per ispirazione e supporto
+- [GitPython](https://github.com/gitpython-developers/GitPython) for Git interface
+- [Lizard](https://github.com/terryyin/lizard) for complexity analysis
+- [Pylint](https://github.com/PyCQA/pylint) for static analysis
+- Open source community for inspiration and support
 
 ---
 
