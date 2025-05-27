@@ -1,4 +1,5 @@
 # Repository Analyzer 🔍
+
 Un potente strumento per analizzare metriche di qualità del codice Python commit per commit in repository Git, con supporto per analisi parallela e classificazione automatica dei commit.
 
 ## 🌟 Caratteristiche Principali
@@ -14,22 +15,26 @@ Un potente strumento per analizzare metriche di qualità del codice Python commi
 ## 📊 Metriche Estratte
 
 ### 🔢 Metriche Base
+
 - **LOC**: Linee di codice aggiunte/eliminate
 - **File modificati**: Numero e lista dei file cambiati
 - **Autore e timestamp**: Informazioni sull'autore e data del commit
 
 ### 🧠 Metriche di Complessità
+
 - **Complessità Ciclomatica**: Per commit e per progetto (usando Lizard)
 - **Esperienza Autore**: Numero di commit precedenti dell'autore
 - **Tempo tra Commit**: Tempo trascorso dall'ultimo commit dell'autore
 
 ### 🐛 Metriche di Qualità
+
 - **Code Smells**: Rilevamento tramite CodeSmile
 - **Warning**: Usando Pylint per analisi statica
 - **Densità di Smell**: Rapporto smells/LOC
 - **Bug Fix Detection**: Identificazione automatica di commit di bug fix
 
 ### 🏷️ Classificazione Commit
+
 - **New Feature**: Nuove funzionalità
 - **Bug Fixing**: Correzione di errori
 - **Enhancement**: Miglioramenti e aggiornamenti
@@ -58,7 +63,7 @@ git clone https://github.com/ssilvestri15/smell_ai.git
 git clone https://github.com/ssilvestri15/repo-analyzer.git
 cd repo-analyzer
 
-python3.11 .m venv .venv
+python3.11 -m venv .venv
 source ./venv/bin/activate
 
 # Installa le dipendenze
@@ -142,6 +147,7 @@ repo_analysis_results/
 ## 📈 Esempio di Metriche
 
 ### CSV Output (commit_metrics.csv)
+
 ```csv
 commit_hash,author,date,message,LOC_added,LOC_deleted,files_changed,commit_cyclomatic_complexity,project_cyclomatic_complexity,author_experience,time_since_last_commit,smell_density,num_warnings,is_pr,is_bug_fix,new_feature,bug_fixing,enhancement,refactoring
 abc123...,John Doe,2024-01-15T10:30:00,Add user authentication,45,12,3,8.5,156.2,15,2.5,0.0023,2,False,False,1,0,0,0
@@ -149,6 +155,7 @@ def456...,Jane Smith,2024-01-16T14:20:00,Fix login bug,8,15,2,3.2,158.9,8,3.1,0.
 ```
 
 ### Report Summary
+
 ```txt
 Report di analisi per: example-repo
 Data: 2024-01-20 15:30:45
@@ -190,18 +197,21 @@ python -m repo_analyzer file repos.txt \
 ### Errori Comuni
 
 **GitPython "read of closed file"**:
+
 ```bash
 # Usa modalità sequenziale
 python -m repo_analyzer single URL --sequential
 ```
 
 **Repository corrotto o commit mancanti**:
+
 ```bash
 # L'analyzer salta automaticamente commit corrotti
 # Controlla error_report.txt per dettagli
 ```
 
 **Memoria insufficiente**:
+
 ```bash
 # Riduci i worker paralleli
 python -m repo_analyzer single URL --max-workers 1
@@ -221,7 +231,8 @@ Questo progetto è licenziato sotto la MIT License - vedi il file [LICENSE](LICE
 ## 👨‍💻 Autore
 
 **Simone Silvestri**
-- Email: s.silvestri15@studenti.unisa.it
+
+- Email: <s.silvestri15@studenti.unisa.it>
 - Università: Università di Salerno
 
 ## 🙏 Riconoscimenti
