@@ -767,7 +767,6 @@ class RepoAnalyzer:
                         result_cs = CodeAnalysisUtils.detect_code_smells(full_path)
                         if result_cs:
                             total_smells += result_cs.get('total_smells', 0)
-                        total_smells += CodeAnalysisUtils.detect_code_smells(full_path)
                     except Exception as sm_err:
                         logger.warning(f"Error detecting code smells for {file_path}: {sm_err}")
                     
