@@ -605,6 +605,7 @@ class RepoAnalyzer:
                 project_cyclomatic_complexity=project_complexity,
                 author_experience=author_experience,
                 time_since_last_commit=time_since_last_commit,
+                total_smells_found=total_smells,
                 smell_density=smell_density,
                 num_warnings=total_warnings,
                 is_pr=is_pr,

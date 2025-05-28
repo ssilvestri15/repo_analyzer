@@ -34,9 +34,29 @@ def create_single_repo_report(output_dir: str, metrics_df: pd.DataFrame, repo_na
             f.write(f"- Tempo medio dall'ultimo commit: {metrics_df['time_since_last_commit'].mean():.2f} ore\n")
             f.write(f"- Densità di smell media: {metrics_df['smell_density'].mean():.4f}\n")
             f.write(f"- Numero medio di warning: {metrics_df['num_warnings'].mean():.2f}\n")
+            f.write(f"- Smell totali trovati: {metrics_df['total_smells_found'].sum()}\n")
+            f.write(f"- Smell totali trovati per commit: {metrics_df['total_smells_found'].mean():.2f}\n")
+            
+            f.write(f"\nTipologie di commit:\n")
             f.write(f"- Numero medio di bug fix: {metrics_df['is_bug_fix'].sum()} ({metrics_df['is_bug_fix'].mean()*100:.2f}%)\n")
-            f.write(f"\nNumero di Pull Request: {metrics_df['is_pr'].sum()} ({metrics_df['is_pr'].mean()*100:.2f}%)\n")
-            f.write(f"Numero di autori distinti: {len(metrics_df['author'].unique())}\n")
+            f.write(f"- Commit di nuove funzionalità: {metrics_df['new_feature'].sum()} ({metrics_df['new_feature'].mean()*100:.2f}%)\n")
+            f.write(f"- Commit di enhancement: {metrics_df['enhancement'].sum()} ({metrics_df['enhancement'].mean()*100:.2f}%)\n")
+            f.write(f"- Commit di refactoring: {metrics_df['refactoring'].sum()} ({metrics_df['refactoring'].mean()*100:.2f}%)\n")
+            f.write(f"- Commit di bug fixing: {metrics_df['bug_fixing'].sum()} ({metrics_df['bug_fixing'].mean()*100:.2f}%)\n")
+            
+            f.write(f"\nInformazioni generali:\n")
+            f.write(f"- Numero di Pull Request: {metrics_df['is_pr'].sum()} ({metrics_df['is_pr'].mean()*100:.2f}%)\n")
+            f.write(f"- Numero di autori distinti: {len(metrics_df['author'].unique())}\n")
+            f.write(f"- Repository: {metrics_df['repo_name'].iloc[0] if len(metrics_df) > 0 else 'N/A'}\n")
+            
+            # Statistiche aggiuntive utili
+            f.write(f"\nStatistiche aggiuntive:\n")
+            f.write(f"- Commit totali analizzati: {len(metrics_df)}\n")
+            f.write(f"- Media LOC nette per commit: {(metrics_df['LOC_added'] - metrics_df['LOC_deleted']).mean():.2f}\n")
+            f.write(f"- Rapporto LOC eliminate/aggiunte: {(metrics_df['LOC_deleted'].sum() / max(metrics_df['LOC_added'].sum(), 1)):.2f}\n")
+            f.write(f"- File medi con complessità modificata: {metrics_df['changed_files_complexity'].apply(len).mean():.2f}\n")
+        else:
+            f.write("Nessun dato disponibile per l'analisi.\n")
     
     logger.info(f"Report riassuntivo salvato in {report_file}")
 

@@ -18,6 +18,7 @@ class CommitMetrics:
     project_cyclomatic_complexity: int = 0  # Complessità ciclomatica totale
     author_experience: int = 0  # Numero di commit precedenti dell'autore
     time_since_last_commit: float = 0.0  # In ore
+    total_smells_found: int = 0 #Numero di smell trovati
     smell_density: float = 0.0  # Smell per LOC
     num_warnings: int = 0  # Numero di warning nel codice modificato
     is_pr: bool = False  # Flag per Pull Request
