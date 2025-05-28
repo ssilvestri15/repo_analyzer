@@ -89,7 +89,7 @@ class CodeAnalysisUtils:
             return {'complexity_media': 0.0, 'complexity_total': 0.0}
     
     @staticmethod
-    def detect_code_smells(file_path: str) -> int:
+    def detect_code_smells(file_path: str) -> dict:
         """
         TODO: Aggangiare CodeSmilel per rilevare i code smells.
         Rileva i code smells in un file Python.
@@ -100,11 +100,15 @@ class CodeAnalysisUtils:
         Returns:
             Numero di code smells rilevati
         """
-        analyzer = CodeSmileAnalyzer()
-        result_json = analyzer.analyze(file_path)
-        result = json.loads(result_json)
-        print(f"Code smells detected in {file_path}: {result}")
-        return 0
+        try:
+            analyzer = CodeSmileAnalyzer()
+            result_json = analyzer.analyze(file_path)
+            result = json.loads(result_json)
+            print(f"Code smells detected in {file_path}: {result}")
+        except Exception as e:
+            logger.error(f"Errore nel rilevamento dei code smells per {file_path}: {e}")
+            result = {}
+        return result
     
     @staticmethod
     def detect_warnings(file_path: str) -> int:
