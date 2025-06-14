@@ -104,7 +104,6 @@ class CodeAnalysisUtils:
             analyzer = CodeSmileAnalyzer()
             result_json = analyzer.analyze(file_path)
             result = json.loads(result_json)
-            print(f"Code smells detected in {file_path}: {result}")
         except Exception as e:
             logger.error(f"Errore nel rilevamento dei code smells per {file_path}: {e}")
             result = {}

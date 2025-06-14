@@ -11,6 +11,7 @@ setup(
         "pylint>=2.15.0",
         "requests>=2.28.1",
         "tqdm>=4.64.0",
+        "rich>=13.0.0",
         "psutil>=5.9.0",
     ],
     entry_points={

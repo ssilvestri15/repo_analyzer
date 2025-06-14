@@ -1,4 +1,4 @@
-"""Optimized parallel analyzer for multiple Git repositories."""
+"""Optimized parallel analyzer for multiple Git repositories with parallel commit processing."""
 
 import os
 import logging
@@ -12,6 +12,7 @@ import pandas as pd
 
 from ..models import RepositoryInfo
 from ..analyzers.repo_analyzer import RepoAnalyzer
+from ..analyzers.parallel_repo_analyzer import RepoAnalyzerFactory
 from ..utils import create_comparative_report
 
 logger = logging.getLogger('repo_analyzer.multi_repo_analyzer')
@@ -49,14 +50,18 @@ class MultiRepoAnalyzer:
         
         logger.info(f"Multi-repository analyzer initialized. Results will be saved to: {self.output_dir}")
     
-    def analyze_from_url_list(self, url_list: List[str], max_commits: Optional[int] = None, resume: bool = False):
+    def analyze_from_url_list(self, url_list: List[str], max_commits: Optional[int] = None, 
+                             resume: bool = False, parallel_commits: bool = True, 
+                             commit_workers: Optional[int] = None):
         """
-        Analyze multiple repositories from a list of URLs.
+        Analyze multiple repositories from a list of URLs with support for parallel commit processing.
         
         Args:
             url_list: List of repository URLs to analyze
             max_commits: Maximum number of commits to analyze per repository
             resume: Flag to resume previously interrupted analysis
+            parallel_commits: Whether to use parallel commit processing for each repository
+            commit_workers: Number of workers for parallel commit processing
         """
         self.analysis_stats['total_repos'] = len(url_list)
         self.analysis_stats['start_time'] = time.time()
@@ -78,11 +83,13 @@ class MultiRepoAnalyzer:
             logger.info("All repositories have already been analyzed. Nothing to do.")
             return
         
-        logger.info(f"Starting analysis of {len(pending_urls)} repositories in parallel")
+        mode_text = "parallel" if parallel_commits else "sequential"
+        worker_text = f" with {commit_workers} workers" if commit_workers and parallel_commits else ""
+        logger.info(f"Starting analysis of {len(pending_urls)} repositories using {mode_text} commit processing{worker_text}")
         
         # Configure worker count based on repository count
         effective_workers = min(len(pending_urls), self.max_workers if self.max_workers else os.cpu_count())
-        logger.info(f"Using {effective_workers} worker processes")
+        logger.info(f"Using {effective_workers} repository worker processes")
         
         with concurrent.futures.ProcessPoolExecutor(max_workers=effective_workers) as executor:
             # Prepare parameters for each repository
@@ -97,8 +104,15 @@ class MultiRepoAnalyzer:
                     output_dir=repo_output_dir
                 )
                 
-                # Submit the task
-                future = executor.submit(self._analyze_single_repo, repo_info, max_commits, resume)
+                # Submit the task with parallel/sequential mode selection
+                future = executor.submit(
+                    self._analyze_single_repo_with_mode, 
+                    repo_info, 
+                    max_commits, 
+                    resume, 
+                    parallel_commits, 
+                    commit_workers
+                )
                 futures.append((future, repo_name, url))
             
             # Process results as they complete
@@ -136,7 +150,9 @@ class MultiRepoAnalyzer:
             self._combine_results()
             self._generate_analysis_summary()
     
-    def analyze_from_file(self, file_path: str, max_commits: Optional[int] = None, resume: bool = False):
+    def analyze_from_file(self, file_path: str, max_commits: Optional[int] = None, 
+                         resume: bool = False, parallel_commits: bool = True, 
+                         commit_workers: Optional[int] = None):
         """
         Analyze multiple repositories by reading URLs from a file.
         
@@ -144,6 +160,8 @@ class MultiRepoAnalyzer:
             file_path: Path to file containing repository URLs (one per line)
             max_commits: Maximum number of commits to analyze per repository
             resume: Flag to resume previously interrupted analysis
+            parallel_commits: Whether to use parallel commit processing
+            commit_workers: Number of workers for parallel commit processing
         """
         urls = []
         try:
@@ -154,9 +172,11 @@ class MultiRepoAnalyzer:
             return
         
         logger.info(f"Found {len(urls)} URLs in file {file_path}")
-        self.analyze_from_url_list(urls, max_commits, resume)
+        self.analyze_from_url_list(urls, max_commits, resume, parallel_commits, commit_workers)
     
-    def analyze_from_config(self, config_file: str, max_commits: Optional[int] = None, resume: bool = False):
+    def analyze_from_config(self, config_file: str, max_commits: Optional[int] = None, 
+                           resume: bool = False, parallel_commits: bool = True, 
+                           commit_workers: Optional[int] = None):
         """
         Analyze repositories based on a JSON configuration file.
         
@@ -164,6 +184,8 @@ class MultiRepoAnalyzer:
             config_file: Path to JSON configuration file
             max_commits: Maximum number of commits to analyze per repository (overrides config)
             resume: Flag to resume previously interrupted analysis
+            parallel_commits: Whether to use parallel commit processing
+            commit_workers: Number of workers for parallel commit processing
         """
         try:
             with open(config_file, 'r') as f:
@@ -179,8 +201,15 @@ class MultiRepoAnalyzer:
             if max_commits is None and 'max_commits' in config:
                 max_commits = config.get('max_commits')
             
+            # Get parallel settings from config if not provided
+            if 'parallel_commits' in config and parallel_commits is None:
+                parallel_commits = config.get('parallel_commits', True)
+            
+            if 'commit_workers' in config and commit_workers is None:
+                commit_workers = config.get('commit_workers')
+            
             logger.info(f"Found {len(urls)} repositories in config file {config_file}")
-            self.analyze_from_url_list(urls, max_commits, resume)
+            self.analyze_from_url_list(urls, max_commits, resume, parallel_commits, commit_workers)
             
         except Exception as e:
             logger.error(f"Error processing config file {config_file}: {e}")
@@ -192,19 +221,23 @@ class MultiRepoAnalyzer:
             repo_name = repo_name[:-4]
         return repo_name
     
-    def _analyze_single_repo(self, repo_info: RepositoryInfo, max_commits: Optional[int], resume: bool) -> str:
+    def _analyze_single_repo_with_mode(self, repo_info: RepositoryInfo, max_commits: Optional[int], 
+                                      resume: bool, parallel_commits: bool, 
+                                      commit_workers: Optional[int]) -> str:
         """
-        Analyze a single repository with enhanced error handling.
+        Analyze a single repository with the specified processing mode.
         
         Args:
             repo_info: Repository information
             max_commits: Maximum number of commits to analyze
             resume: Flag to resume interrupted analysis
+            parallel_commits: Whether to use parallel commit processing
+            commit_workers: Number of workers for parallel processing
         
         Returns:
             Name of the analyzed repository or None if analysis failed
         """
-        logger.info(f"Starting analysis of repository: {repo_info.name}")
+        logger.info(f"Starting {'parallel' if parallel_commits else 'sequential'} analysis of repository: {repo_info.name}")
         
         # Ensure output directory exists with proper permissions
         try:
@@ -214,35 +247,30 @@ class MultiRepoAnalyzer:
             logger.error(f"Error creating output directory for {repo_info.name}: {dir_err}")
             return None
         
-        # Try different cloning strategies if needed
+        # Try different strategies if analysis fails
         strategies = [
-            {"depth": 100, "branch": "master"},  # Start with a shallow clone of master
-            {"depth": 100},                      # Try shallow clone without branch
-            {"depth": 1000},                     # Try deeper clone
-            {"mirror": True},                    # Try full mirror clone
-            {}                                  # Finally try default clone
+            {"parallel": parallel_commits, "workers": commit_workers},
+            {"parallel": False, "workers": 1},  # Fallback to sequential
         ]
         
-        for strategy_index, clone_options in enumerate(strategies):
+        # If we're already using sequential, don't try parallel as fallback
+        if not parallel_commits:
+            strategies = [{"parallel": False, "workers": 1}]
+        
+        for strategy_index, strategy in enumerate(strategies):
             try:
-                # Set up temporary directory with a unique name for this attempt
-                temp_dir = os.path.join(repo_info.output_dir, f"temp_{strategy_index}_{int(time.time())}")
-                os.makedirs(temp_dir, exist_ok=True)
+                logger.info(f"Trying analysis strategy {strategy_index+1}/{len(strategies)} "
+                           f"({'parallel' if strategy['parallel'] else 'sequential'}) for {repo_info.name}")
                 
-                # Set clone options
-                repo_info.clone_options = clone_options
-                repo_info.temp_dir = temp_dir
-                repo_info.local_path = os.path.join(temp_dir, "repo")
+                # Create analyzer using factory
+                analyzer = RepoAnalyzerFactory.create_analyzer(
+                    repo_info=repo_info,
+                    resume=resume,
+                    parallel=strategy["parallel"],
+                    max_workers=strategy["workers"]
+                )
                 
-                # Define worker count
-                worker_count = max(1, (os.cpu_count() // 4) if self.max_workers is None else (self.max_workers // 4))
-                
-                # Log cloning strategy
-                strategy_desc = ', '.join(f"{k}={v}" for k, v in clone_options.items()) if clone_options else "default"
-                logger.info(f"Trying repository analysis with strategy {strategy_index+1}/{len(strategies)} ({strategy_desc}) for {repo_info.name}")
-                
-                # Create analyzer and run analysis
-                analyzer = RepoAnalyzer(repo_info, resume, max_workers=worker_count)
+                # Run analysis
                 analyzer.analyze_repository(max_commits)
                 analyzer.cleanup()
                 
@@ -253,17 +281,9 @@ class MultiRepoAnalyzer:
                 error_msg = str(e)
                 logger.warning(f"Strategy {strategy_index+1} failed for {repo_info.name}: {error_msg}")
                 
-                # Clean up this attempt's temp directory
-                try:
-                    if os.path.exists(temp_dir):
-                        subprocess.run(['chmod', '-R', '+w', temp_dir], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                        shutil.rmtree(temp_dir)
-                except Exception as clean_err:
-                    logger.warning(f"Error cleaning temp directory: {clean_err}")
-                
                 # If we've tried all strategies, give up
                 if strategy_index == len(strategies) - 1:
-                    logger.error(f"All cloning strategies failed for {repo_info.url}")
+                    logger.error(f"All analysis strategies failed for {repo_info.url}")
                     return None
                 
                 # Wait before trying next strategy
@@ -423,3 +443,301 @@ class MultiRepoAnalyzer:
             summary['by_repository'][repo_name] = repo_summary
 
         return summary
+    
+    def _generate_analysis_summary(self):
+        """Generate a final summary of the multi-repository analysis."""
+        total_time = self.analysis_stats['end_time'] - self.analysis_stats['start_time']
+        
+        logger.info("=== MULTI-REPOSITORY ANALYSIS COMPLETED ===")
+        logger.info(f"Total repositories: {self.analysis_stats['total_repos']}")
+        logger.info(f"Successfully analyzed: {self.analysis_stats['successful_repos']}")
+        logger.info(f"Failed repositories: {self.analysis_stats['failed_repos']}")
+        logger.info(f"Success rate: {(self.analysis_stats['successful_repos'] / self.analysis_stats['total_repos'] * 100):.1f}%")
+        logger.info(f"Total analysis time: {total_time:.2f} seconds")
+        logger.info(f"Average time per repository: {(total_time / max(self.analysis_stats['total_repos'], 1)):.2f} seconds")
+        
+        if self.failed_repos:
+            logger.warning("Failed repositories:")
+            for repo_name, repo_url in self.failed_repos:
+                logger.warning(f"  - {repo_name} ({repo_url})")
+        
+        # Generate performance statistics
+        summary_file = os.path.join(self.output_dir, "multi_repo_summary.json")
+        summary_data = {
+            'analysis_stats': self.analysis_stats,
+            'failed_repos': self.failed_repos,
+            'successful_repos': self.all_results,
+            'performance': {
+                'total_time_seconds': total_time,
+                'average_time_per_repo': total_time / max(self.analysis_stats['total_repos'], 1),
+                'success_rate_percent': (self.analysis_stats['successful_repos'] / self.analysis_stats['total_repos'] * 100) if self.analysis_stats['total_repos'] > 0 else 0
+            }
+        }
+        
+        with open(summary_file, 'w') as f:
+            json.dump(summary_data, f, indent=2)
+        logger.info(f"Multi-repository summary saved to {summary_file}")
+
+
+class EnhancedMultiRepoAnalyzer(MultiRepoAnalyzer):
+    """Enhanced version with advanced parallel processing and optimization features."""
+    
+    def __init__(self, output_dir: str = "repo_analysis_results", max_workers: Optional[int] = None,
+                 enable_smart_scheduling: bool = True, enable_resource_monitoring: bool = True):
+        """
+        Initialize the enhanced multi-repository analyzer.
+        
+        Args:
+            output_dir: Main directory for storing results
+            max_workers: Maximum number of parallel worker processes
+            enable_smart_scheduling: Enable intelligent scheduling based on repository size
+            enable_resource_monitoring: Enable real-time resource monitoring
+        """
+        super().__init__(output_dir, max_workers)
+        self.enable_smart_scheduling = enable_smart_scheduling
+        self.enable_resource_monitoring = enable_resource_monitoring
+        self.repo_priorities = {}  # Repository priority queue for smart scheduling
+        
+        if enable_resource_monitoring:
+            self._setup_resource_monitoring()
+    
+    def _setup_resource_monitoring(self):
+        """Setup real-time resource monitoring."""
+        import psutil
+        self.initial_memory = psutil.virtual_memory().percent
+        self.initial_cpu = psutil.cpu_percent()
+        logger.info(f"Resource monitoring enabled. Initial: Memory {self.initial_memory}%, CPU {self.initial_cpu}%")
+    
+    def analyze_from_url_list_enhanced(self, url_list: List[str], max_commits: Optional[int] = None,
+                                     resume: bool = False, parallel_commits: bool = True,
+                                     commit_workers: Optional[int] = None, 
+                                     adaptive_workers: bool = True):
+        """
+        Enhanced analysis with adaptive worker management and smart scheduling.
+        
+        Args:
+            url_list: List of repository URLs to analyze
+            max_commits: Maximum number of commits to analyze per repository
+            resume: Flag to resume previously interrupted analysis
+            parallel_commits: Whether to use parallel commit processing
+            commit_workers: Number of workers for parallel commit processing
+            adaptive_workers: Enable adaptive worker count based on system load
+        """
+        if self.enable_smart_scheduling:
+            # Pre-analyze repositories to determine optimal processing order
+            url_list = self._smart_schedule_repositories(url_list)
+        
+        # Monitor resources and adjust workers if needed
+        if adaptive_workers and self.enable_resource_monitoring:
+            optimal_workers = self._calculate_adaptive_workers()
+            self.max_workers = optimal_workers
+            logger.info(f"Adaptive workers: Using {optimal_workers} workers based on system resources")
+        
+        # Call the parent method with enhancements
+        self.analyze_from_url_list(url_list, max_commits, resume, parallel_commits, commit_workers)
+        
+        # Generate enhanced reports
+        self._generate_enhanced_reports()
+    
+    def _smart_schedule_repositories(self, url_list: List[str]) -> List[str]:
+        """
+        Intelligently schedule repositories based on size and complexity estimates.
+        
+        Args:
+            url_list: Original list of repository URLs
+            
+        Returns:
+            Reordered list optimized for parallel processing
+        """
+        logger.info("Analyzing repositories for smart scheduling...")
+        
+        repo_info_list = []
+        for url in url_list:
+            try:
+                # Quick analysis to estimate repository complexity
+                repo_name = self._get_repo_name(url)
+                priority_score = self._estimate_repo_priority(url)
+                repo_info_list.append((url, repo_name, priority_score))
+            except Exception as e:
+                logger.warning(f"Could not analyze {url} for scheduling: {e}")
+                repo_info_list.append((url, self._get_repo_name(url), 1.0))  # Default priority
+        
+        # Sort by priority (higher priority = more complex, should start first)
+        repo_info_list.sort(key=lambda x: x[2], reverse=True)
+        
+        optimized_order = [info[0] for info in repo_info_list]
+        
+        logger.info("Smart scheduling completed:")
+        for i, (url, repo_name, priority) in enumerate(repo_info_list[:5]):  # Show top 5
+            logger.info(f"  {i+1}. {repo_name} (priority: {priority:.2f})")
+        
+        return optimized_order
+    
+    def _estimate_repo_priority(self, url: str) -> float:
+        """
+        Estimate repository processing priority based on available information.
+        Higher priority = should be processed first.
+        
+        Args:
+            url: Repository URL
+            
+        Returns:
+            Priority score (higher = more priority)
+        """
+        try:
+            # If we can access the repo quickly, estimate based on basic metrics
+            import subprocess
+            import tempfile
+            
+            # Quick shallow clone to get basic info
+            with tempfile.TemporaryDirectory() as temp_dir:
+                clone_path = os.path.join(temp_dir, "quick_clone")
+                
+                # Very shallow clone just to get basic info
+                result = subprocess.run(
+                    ['git', 'clone', '--depth', '10', url, clone_path],
+                    capture_output=True, text=True, timeout=60
+                )
+                
+                if result.returncode != 0:
+                    return 1.0  # Default priority if can't clone
+                
+                # Count Python files
+                python_files = 0
+                total_size = 0
+                for root, dirs, files in os.walk(clone_path):
+                    for file in files:
+                        if file.endswith('.py'):
+                            python_files += 1
+                            try:
+                                file_path = os.path.join(root, file)
+                                total_size += os.path.getsize(file_path)
+                            except:
+                                pass
+                
+                # Get commit count (limited by shallow clone)
+                try:
+                    commit_result = subprocess.run(
+                        ['git', 'rev-list', '--count', 'HEAD'],
+                        cwd=clone_path, capture_output=True, text=True, timeout=10
+                    )
+                    commit_count = int(commit_result.stdout.strip()) if commit_result.returncode == 0 else 10
+                except:
+                    commit_count = 10
+                
+                # Calculate priority score
+                # Factors: number of Python files, total size, estimated commits
+                file_factor = min(python_files / 100, 2.0)  # Normalized
+                size_factor = min(total_size / (1024 * 1024), 2.0)  # Size in MB, normalized
+                commit_factor = min(commit_count / 1000, 2.0)  # Normalized
+                
+                priority = (file_factor + size_factor + commit_factor) / 3
+                return max(0.1, priority)  # Minimum priority
+                
+        except Exception as e:
+            logger.debug(f"Could not estimate priority for {url}: {e}")
+            return 1.0  # Default priority
+    
+    def _calculate_adaptive_workers(self) -> int:
+        """
+        Calculate optimal number of workers based on current system resources.
+        
+        Returns:
+            Optimal worker count
+        """
+        import psutil
+        
+        # Get current system state
+        memory_percent = psutil.virtual_memory().percent
+        cpu_percent = psutil.cpu_percent(interval=1)
+        cpu_count = psutil.cpu_count()
+        
+        # Base calculation
+        base_workers = self.max_workers or max(2, cpu_count // 2)
+        
+        # Adjust based on memory usage
+        if memory_percent > 80:
+            memory_factor = 0.5  # Reduce workers significantly
+        elif memory_percent > 60:
+            memory_factor = 0.7  # Reduce workers moderately
+        else:
+            memory_factor = 1.0  # No reduction
+        
+        # Adjust based on CPU usage
+        if cpu_percent > 80:
+            cpu_factor = 0.6  # Reduce workers
+        elif cpu_percent > 60:
+            cpu_factor = 0.8  # Reduce workers slightly
+        else:
+            cpu_factor = 1.0  # No reduction
+        
+        # Calculate final worker count
+        adaptive_workers = int(base_workers * memory_factor * cpu_factor)
+        adaptive_workers = max(1, min(adaptive_workers, cpu_count))  # Bounds check
+        
+        logger.debug(f"Adaptive workers calculation: Memory {memory_percent}%, CPU {cpu_percent}%, "
+                    f"Base {base_workers} -> Final {adaptive_workers}")
+        
+        return adaptive_workers
+    
+    def _generate_enhanced_reports(self):
+        """Generate enhanced reports with performance analytics."""
+        if not self.enable_resource_monitoring:
+            return
+        
+        try:
+            import psutil
+            
+            # Performance metrics
+            final_memory = psutil.virtual_memory().percent
+            final_cpu = psutil.cpu_percent()
+            
+            performance_report = {
+                'resource_usage': {
+                    'initial_memory_percent': self.initial_memory,
+                    'final_memory_percent': final_memory,
+                    'memory_delta': final_memory - self.initial_memory,
+                    'initial_cpu_percent': self.initial_cpu,
+                    'final_cpu_percent': final_cpu,
+                    'cpu_delta': final_cpu - self.initial_cpu
+                },
+                'optimization_features': {
+                    'smart_scheduling_enabled': self.enable_smart_scheduling,
+                    'resource_monitoring_enabled': self.enable_resource_monitoring,
+                    'final_worker_count': self.max_workers
+                },
+                'recommendations': self._generate_performance_recommendations()
+            }
+            
+            perf_file = os.path.join(self.output_dir, "performance_report.json")
+            with open(perf_file, 'w') as f:
+                json.dump(performance_report, f, indent=2)
+            
+            logger.info(f"Enhanced performance report saved to {perf_file}")
+            
+        except Exception as e:
+            logger.error(f"Error generating enhanced reports: {e}")
+    
+    def _generate_performance_recommendations(self) -> List[str]:
+        """Generate performance recommendations based on analysis results."""
+        recommendations = []
+        
+        if self.analysis_stats['failed_repos'] > 0:
+            failure_rate = self.analysis_stats['failed_repos'] / self.analysis_stats['total_repos']
+            if failure_rate > 0.2:
+                recommendations.append("High failure rate detected. Consider using sequential mode for problematic repositories.")
+        
+        if self.enable_resource_monitoring:
+            import psutil
+            memory_usage = psutil.virtual_memory().percent
+            if memory_usage > 80:
+                recommendations.append("High memory usage detected. Consider reducing max_workers or enabling adaptive workers.")
+        
+        total_time = self.analysis_stats.get('end_time', 0) - self.analysis_stats.get('start_time', 0)
+        if total_time > 3600:  # More than 1 hour
+            recommendations.append("Long analysis time. Consider using more parallel workers or analyzing fewer commits per repository.")
+        
+        if len(recommendations) == 0:
+            recommendations.append("Analysis completed efficiently with current settings.")
+        
+        return recommendations

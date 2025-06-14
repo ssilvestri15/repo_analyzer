@@ -58,6 +58,9 @@ class RepoAnalyzer:
         self.bugged_files_freq = {}
         self.edited_files_freq = {}
         self.edited_files_complexity = {}
+
+        # Progress display integration
+        self._progress = None
         
         # Load previous state if resuming
         if resume:
@@ -764,10 +767,18 @@ class RepoAnalyzer:
     # Add remaining essential methods for full functionality
     def analyze_repository(self, max_commits: Optional[int] = None):
         """Analyze the repository"""
+
+        if self._progress:
+            self._progress.log("Starting sequential analysis...")
+
         all_commits = self._get_ordered_commits()
         
         if max_commits:
             all_commits = all_commits[:max_commits]
+
+        if self._progress:
+            self._progress.set_total_commits(len(all_commits))
+            self._progress.log(f"Found {len(all_commits)} commits to analyze")
         
         start_index = self._find_resume_point(all_commits)
         
@@ -894,20 +905,26 @@ class RepoAnalyzer:
                     self.commit_metrics.append(metrics)
                     self.analyzed_commits.add(metrics.commit_hash)
 
+                    # AGGIORNA PROGRESS
+                    if self._progress:
+                        self._progress.increment_analyzed(metrics.commit_hash)
+                        self._progress.log(f"Analyzed commit {metrics.commit_hash[:8]}")
+
                     # Save results and checkpoint after EACH commit
                     self.save_results()
                     self.save_checkpoint(metrics.commit_hash)
-
-                    # Print progress
-                    progress = (i + 1) / total_remaining * 100
-                    logger.info(f"Progress: {i+1}/{total_remaining} ({progress:.1f}%)")
+                else:
+                    # AGGIORNA PROGRESS
+                    if self._progress:
+                        self._progress.increment_skipped()
+                        self._progress.log(f"Skipped commit {commit.hexsha[:8]}")
 
             # Final save
             self.save_results()
 
         except KeyboardInterrupt:
-            logger.warning("\nManual interruption detected. State already saved.")
-            logger.info("You can resume analysis with the --resume option")
+            if self._progress:
+                self._progress.log("Manual interruption detected. State saved.")
     
     def save_checkpoint(self, last_commit_hash: str):
         """Save a checkpoint to resume analysis in case of error."""
