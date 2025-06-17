@@ -128,7 +128,8 @@ def _analyze_single_repository(args):
         repo_info=repo_info,
         resume=args.resume,
         parallel=parallel_mode,
-        max_workers=max_workers
+        max_workers=max_workers,
+        smell_analysis_mode="all"
     )
     
     if args.no_progress:
@@ -140,13 +141,15 @@ def _analyze_single_repository(args):
     else:
         # Modalità con progress display pulito
         try:
-            from .utils.progress_display import ProgressContext
+            from .utils.progress_display import EnhancedProgressContext
+            from .utils.progress_integration_utils import patch_analyzer_with_progress
+
         except ImportError:
             print("Progress display not available, falling back to minimal output")
             _analyze_single_repository_fallback(args, analyzer)
             return
         
-        with ProgressContext(repo_info.name) as progress:
+        with EnhancedProgressContext(repo_info.name) as progress:
             try:
                 # Log iniziale
                 mode = "Parallel" if parallel_mode else "Sequential"
@@ -154,6 +157,7 @@ def _analyze_single_repository(args):
                 
                 # Collega progress all'analyzer
                 analyzer._progress = progress
+                patch_analyzer_with_progress(analyzer, progress)
                 
                 # Pre-scan dei commit se possibile
                 try:
