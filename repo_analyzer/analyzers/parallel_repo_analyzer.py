@@ -25,6 +25,52 @@ from .smell_tracker import SmellEvolutionTracker, SmellDetection, SmellEventType
 
 logger = logging.getLogger('repo_analyzer.parallel_repo_analyzer')
 
+class FileComplexityState:
+    """Stato della complessità dei file nel progetto."""
+    
+    def __init__(self):
+        # Mappa: file_path -> complessità corrente
+        self.current_complexities: Dict[str, float] = {}
+        # Statistiche per debugging
+        self.files_added = 0
+        self.files_modified = 0
+        self.files_deleted = 0
+        self.total_operations = 0
+    
+    def update_file(self, file_path: str, new_complexity: float, operation: str = 'modified'):
+        """Aggiorna la complessità di un file."""
+        old_complexity = self.current_complexities.get(file_path, 0.0)
+        
+        if operation == 'deleted':
+            if file_path in self.current_complexities:
+                del self.current_complexities[file_path]
+                self.files_deleted += 1
+        else:
+            self.current_complexities[file_path] = new_complexity
+            if operation == 'added':
+                self.files_added += 1
+            else:
+                self.files_modified += 1
+        
+        self.total_operations += 1
+        return old_complexity, new_complexity
+    
+    def get_total_complexity(self) -> float:
+        """Restituisce la complessità totale corrente."""
+        return sum(self.current_complexities.values())
+    
+    def get_stats(self) -> Dict:
+        """Restituisce statistiche dello stato."""
+        return {
+            'active_files': len(self.current_complexities),
+            'total_complexity': self.get_total_complexity(),
+            'files_added': self.files_added,
+            'files_modified': self.files_modified,
+            'files_deleted': self.files_deleted,
+            'total_operations': self.total_operations
+        }
+
+
 class CommitAnalysisTask:
     """Singola unità di lavoro per l'analisi di un commit."""
     
@@ -914,43 +960,239 @@ class ParallelRepoAnalyzer:
             raise
     
     def _process_collected_project_metrics(self, results: List[Dict]):
-        """Processa le metriche di progetto usando i dati già raccolti durante l'analisi."""
-        logger.info("Processing project metrics from collected data...")
-        
+        """
+        Processa le metriche di progetto derivando cronologicamente la complessità.
+        VERSIONE INTEGRATA che riutilizza il codice esistente.
+        """
+        logger.info("Processing project metrics with chronological complexity derivation...")
+
         try:
+            if not results:
+                logger.warning("No results to process for project metrics")
+                return
+
+            # PASSO 1: Ordina risultati cronologicamente (riutilizza logica esistente)
+            logger.info("Sorting commits chronologically for complexity derivation...")
+
+            try:
+                # Ordina per data (dal primo all'ultimo commit)
+                sorted_results = sorted(results, key=lambda x: x.get('date', ''))
+
+                first_date = sorted_results[0].get('date', 'unknown')
+                last_date = sorted_results[-1].get('date', 'unknown')
+                logger.info(f"Processing {len(sorted_results)} commits from {first_date} to {last_date}")
+
+            except Exception as sort_err:
+                logger.error(f"Error sorting commits: {sort_err}")
+                # Fallback: usa ordine originale
+                sorted_results = results
+
+            # PASSO 2: Inizializza stato complessità (riutilizza pattern esistente)
+            complexity_state = FileComplexityState()
+
+            # PASSO 3: Processa ogni commit cronologicamente
             processed_count = 0
-            
+            complexity_derivation_errors = 0
+
+            for i, result in enumerate(sorted_results):
+                commit_hash = result.get('commit_hash', 'unknown')
+
+                try:
+                    # Deriva complessità per questo commit
+                    project_complexity = self._derive_complexity_for_commit(
+                        result, complexity_state
+                    )
+
+                    # Aggiorna risultato con complessità derivata
+                    result['project_cyclomatic_complexity'] = project_complexity
+                    result['project_active_files'] = len(complexity_state.current_complexities)
+                    result['complexity_calculation_method'] = 'derived_chronological'
+
+                    processed_count += 1
+
+                    # Progress logging (riutilizza pattern esistente)
+                    if processed_count % 500 == 0:
+                        stats = complexity_state.get_stats()
+                        logger.info(f"Derived complexity for {processed_count}/{len(sorted_results)} commits. "
+                                  f"Current: {stats['total_complexity']:.1f} complexity, "
+                                  f"{stats['active_files']} files")
+
+                        if self._progress:
+                            self._progress.log(f"Project complexity: {processed_count}/{len(sorted_results)} processed")
+
+                except Exception as commit_err:
+                    logger.warning(f"Error deriving complexity for commit {commit_hash[:8]}: {commit_err}")
+                    complexity_derivation_errors += 1
+
+                    # Fallback: usa complessità commit come approssimazione
+                    fallback_complexity = result.get('commit_cyclomatic_complexity', 0)
+                    result['project_cyclomatic_complexity'] = fallback_complexity
+                    result['complexity_calculation_method'] = 'fallback_commit_complexity'
+
+            # PASSO 4: Statistiche finali (riutilizza pattern logging esistente)
+            final_stats = complexity_state.get_stats()
+
+            logger.info("Project complexity derivation completed:")
+            logger.info(f"  - Commits processed: {processed_count}/{len(results)}")
+            logger.info(f"  - Derivation errors: {complexity_derivation_errors}")
+            logger.info(f"  - Final project complexity: {final_stats['total_complexity']:.1f}")
+            logger.info(f"  - Active files: {final_stats['active_files']}")
+            logger.info(f"  - File operations: +{final_stats['files_added']} "
+                       f"~{final_stats['files_modified']} -{final_stats['files_deleted']}")
+
+            # PASSO 5: Cleanup campi temporanei (riutilizza pattern esistente)
             for result in results:
-                # Usa i dati project già raccolti durante l'analisi
-                project_estimated_complexity = result.get('project_estimated_complexity', 0)
-                
-                # Se abbiamo dati project raccolti, usali
-                if project_estimated_complexity > 0:
-                    result['project_cyclomatic_complexity'] = project_estimated_complexity
-                else:
-                    # Fallback: usa la complessità del commit come approssimazione
-                    result['project_cyclomatic_complexity'] = result.get('commit_cyclomatic_complexity', 0)
-                
-                # Rimuovi i campi temporanei di project data per risparmiare spazio
+                # Rimuovi campi temporanei per risparmiare spazio (come nel codice esistente)
                 for temp_field in ['project_total_python_files', 'project_estimated_complexity', 'project_total_loc']:
                     result.pop(temp_field, None)
-                
-                processed_count += 1
-                
-                # Progress ogni 1000 risultati
-                if processed_count % 1000 == 0:
-                    logger.info(f"Processed project metrics for {processed_count}/{len(results)} commits")
-                    if self._progress:
-                        self._progress.log(f"Project metrics: {processed_count}/{len(results)} processed")
-            
-            logger.info(f"Project metrics processing completed for {processed_count} commits")
-            
+
+            if self._progress:
+                self._progress.log(f"✅ Complexity derivation completed: {final_stats['total_complexity']:.1f} total")
+
         except Exception as e:
-            logger.error(f"Error processing collected project metrics: {e}")
-            # Fallback semplice
-            for result in results:
-                if 'project_cyclomatic_complexity' not in result:
-                    result['project_cyclomatic_complexity'] = result.get('commit_cyclomatic_complexity', 0)
+            logger.error(f"Error in project metrics processing: {e}")
+            # Fallback: usa metodo originale
+            self._process_collected_project_metrics_fallback(results)
+
+    def _derive_complexity_for_commit(self, result: Dict, complexity_state: FileComplexityState) -> float:
+        """
+        Deriva la complessità del progetto per un singolo commit.
+        RIUTILIZZA logiche esistenti per determinare file status.
+        """
+        commit_hash = result.get('commit_hash', '')
+        changed_files = result.get('changed_files', [])
+        files_complexity = result.get('changed_files_complexity', {})
+
+        if not changed_files:
+            # Nessun file modificato - mantieni complessità corrente
+            return complexity_state.get_total_complexity()
+
+        # Analizza status dei file (riutilizza approccio simile a smell tracking)
+        file_statuses = self._get_file_statuses_for_complexity(commit_hash, changed_files)
+
+        # Aggiorna stato per ogni file modificato
+        complexity_changes = []
+
+        for file_path in changed_files:
+            if not CodeAnalysisUtils.is_code_file(file_path):
+                continue
+            
+            status = file_statuses.get(file_path, 'modified')
+
+            if status == 'deleted':
+                # File eliminato
+                old_complexity, new_complexity = complexity_state.update_file(
+                    file_path, 0.0, 'deleted'
+                )
+                if old_complexity > 0:
+                    complexity_changes.append(f"-{file_path}({old_complexity:.1f})")
+
+            elif file_path in files_complexity:
+                # File aggiunto o modificato
+                file_complexity_data = files_complexity[file_path]
+                new_complexity = file_complexity_data.get('complexity_total', 0.0)
+
+                operation = 'added' if status == 'added' else 'modified'
+                old_complexity, _ = complexity_state.update_file(
+                    file_path, new_complexity, operation
+                )
+
+                if operation == 'added':
+                    complexity_changes.append(f"+{file_path}({new_complexity:.1f})")
+                elif abs(new_complexity - old_complexity) > 0.1:
+                    delta = new_complexity - old_complexity
+                    complexity_changes.append(f"~{file_path}({delta:+.1f})")
+
+        # Debug logging per cambiamenti significativi
+        if complexity_changes and len(complexity_changes) <= 5:
+            logger.debug(f"Complexity changes in {commit_hash[:8]}: {', '.join(complexity_changes)}")
+
+        return complexity_state.get_total_complexity()
+
+    def _get_file_statuses_for_complexity(self, commit_hash: str, changed_files: List[str]) -> Dict[str, str]:
+        """
+        Determina lo status dei file per derivazione complessità.
+        RIUTILIZZA approccio simile al smell tracking esistente.
+        """
+        file_statuses = {}
+
+        try:
+            # Riutilizza pattern di subprocess simile a quello esistente nel codice
+            result = subprocess.run([
+                'git', 'show', '--name-status', '--pretty=format:', commit_hash
+            ], cwd=self.repo_info.local_path, capture_output=True, text=True, timeout=30)
+
+            if result.returncode == 0:
+                lines = [line.strip() for line in result.stdout.strip().split('\n') if line.strip()]
+
+                for line in lines:
+                    if '\t' in line:
+                        parts = line.split('\t', 1)
+                        if len(parts) == 2:
+                            status_code, file_path = parts
+
+                            # Mappa status Git (riutilizza logica simile a smell tracking)
+                            if status_code.startswith('A'):
+                                status = 'added'
+                            elif status_code.startswith('D'):
+                                status = 'deleted'
+                            elif status_code.startswith('M'):
+                                status = 'modified'
+                            elif status_code.startswith('R'):
+                                # Rename: gestisci come nel smell tracking
+                                if '→' in file_path:
+                                    old_path, new_path = file_path.split('→', 1)
+                                    file_statuses[old_path.strip()] = 'deleted'
+                                    file_statuses[new_path.strip()] = 'added'
+                                    continue
+                                else:
+                                    status = 'modified'
+                            elif status_code.startswith('C'):
+                                status = 'added'  # Copy come aggiunta
+                            else:
+                                status = 'modified'  # Default
+
+                            if file_path in changed_files:
+                                file_statuses[file_path] = status
+
+        except Exception as e:
+            logger.debug(f"Error getting file statuses for {commit_hash}: {e}")
+
+        # Fallback: assume modified per file non trovati (come nel codice esistente)
+        for file_path in changed_files:
+            if file_path not in file_statuses:
+                file_statuses[file_path] = 'modified'
+
+        return file_statuses
+
+    def _process_collected_project_metrics_fallback(self, results: List[Dict]):
+        """
+        Fallback che usa il metodo originale se la derivazione fallisce.
+        MANTIENE compatibilità con codice esistente.
+        """
+        logger.warning("Using fallback project metrics processing")
+        
+        # Usa approssimazione semplice basata su commit complexity
+        processed_count = 0
+        
+        for result in results:
+            commit_complexity = result.get('commit_cyclomatic_complexity', 0)
+            
+            # Fallback semplice: usa commit complexity come proxy
+            if 'project_cyclomatic_complexity' not in result or result['project_cyclomatic_complexity'] == 0:
+                result['project_cyclomatic_complexity'] = commit_complexity
+                result['complexity_calculation_method'] = 'fallback_simple'
+            
+            # Cleanup campi temporanei (mantiene comportamento esistente)
+            for temp_field in ['project_total_python_files', 'project_estimated_complexity', 'project_total_loc']:
+                result.pop(temp_field, None)
+            
+            processed_count += 1
+            
+            if processed_count % 1000 == 0:
+                logger.info(f"Fallback processing: {processed_count}/{len(results)} processed")
+        
+        logger.info(f"Fallback project metrics processing completed for {processed_count} commits")
     
     def _calculate_project_metrics_optimized(self, results: List[Dict]):
         """Calcola metriche di progetto in modo ottimizzato."""
